@@ -1,0 +1,142 @@
+---
+title: "Excercise Predition Model"
+author: "jassalak"
+date: "January 22, 2017"
+output: pdf_document
+---
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement
+
+a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, we use data from accelerometers on the belt, forearm, arm, and dumbbell of 6 participants [@velloso2013]. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. Given data from accelerometers, the goal is to predict the class of action which is one of the following.
+
++ exactly according to the specification (A)
++ throwing elbows to the front (B)
++ lifting the dumbbell only halfway (C)
++ lowering the dumbbell only halfway (D)
++ throwing the hips to the front (E).
+
+
+######[This assignment is performed for Johns Hopkins University Data Science Specialization-Course#8-Week#4]
+
+###__Environment Preparation__
+```{r results ="asis", warning = FALSE}
+rm(list = ls()) 
+#Removes anything in the Environment
+
+setwd("C:/Users/akash/Desktop/StatsCourses/JHU_Specialization/Course8/w4")
+#Sets the working directory
+
+library(knitr)
+opts_chunk$set(eval = TRUE, echo = TRUE, warning = FALSE, 
+               tidy = TRUE, results = "hold", cache = TRUE)
+#Knitr global options
+
+set.seed(2222) 
+#Sets the overall seed for reproducibility
+```
+
+####Load necessary packages
+```{r eval = TRUE, echo = TRUE, results = "asis"}
+library(lattice)
+library(ggplot2)
+library(caret)
+library(randomForest)
+library(rpart)
+library(rpart.plot)
+```
+
+###__Data Processing__
+
+####Upload the Training and Test datasets
+```{r 3}
+TrainSet <- read.csv(
+  'C:/Users/akash/Desktop/StatsCourses/JHU_Specialization/Course8/w4/pml-training.csv', 
+  na.strings=c("NA","#DIV/0!", ""))
+TestSet <- read.csv(
+  'C:/Users/akash/Desktop/StatsCourses/JHU_Specialization/Course8/w4/pml-testing.csv', 
+  na.strings=c("NA","#DIV/0!", ""))
+```
+
+####Delete columns with no values in them (both data sets)
+```{r 4}
+TrainSet<-TrainSet[,colSums(is.na(TrainSet)) == 0]
+TestSet <-TestSet[,colSums(is.na(TestSet)) == 0]
+```
+
+####Remove irrelevant variables (both data sets)
+user_name, raw_timestamp_part_1, raw_timestamp_part_,2 cvtd_timestamp, 
+new_window, and num_window (columns 1 to 7)
+```{r 5}
+TrainSet   <-TrainSet[,-c(1:7)]
+TestSet <-TestSet[,-c(1:7)]
+```
+
+####Check for near zero variance (TrainSet)
+```{r 6}
+nzv <- nearZeroVar(TrainSet, saveMetrics=TRUE)
+if (any(nzv$nzv)) nzv else message("No variables with near zero variance")
+```
+
+####Split the TrainSet into SubTrainSet and SubTestSet; this allows for cross-validation (Train Set)
+```{r 7}
+subsamples <- createDataPartition(y=TrainSet$classe, p=0.6, list=FALSE)
+SubTrainSet <- TrainSet[subsamples, ] 
+SubTestSet <- TrainSet[-subsamples, ]
+```
+
+####Sample the data (SubTestSet)
+```{r eval = FALSE, echo = TRUE}
+head(SubTrainSet)
+dim(SubTrainSet)
+summary(SubTrainSet)
+```
+
+###__First Model (DecisionTree)__
+
+```{r eval = FALSE, echo = TRUE}
+m1 <- rpart(classe ~ ., data=SubTrainSet, method="class") 
+#DecisionTree Model creation
+
+p1 <- predict(m1, SubTrainSet, type = "class")
+#Predicting m1
+
+rpart.plot(m1, main="Classification Tree", extra=102, under=TRUE, faclen=0)
+#Plotting m1
+```
+
+###__Second Model (randomForest)__
+
+```{r 10}
+m2 <- randomForest(classe ~. , data=SubTrainSet, method="class")
+#RandomForest Model creation
+
+p2 <- predict(m2, SubTestSet, type = "class")
+#Predicting m1
+```
+
+###__Prediction on TestSet__
+After performing a Confusion Matrix on both Models, it was determined that Model2 (RandomForest) had a more accurate prediction (accuracy: 0.994).  The out-of-sample error rate is 0.006, or 0.6%.  This number is calculated by (1-(accuracy for predictions made against validation set)).  With a greater than 99% accuracy on the validation set, and a Test Set of 20cases, we can expect few samples to be misclassified.   
+
+```{r 11}
+pfinal <- predict(m2, TestSet, type="class")
+pfinal
+```
+
+###__Submission__
+#### Creating .txt files of the TestDataSet answers
+```{r 12}
+setwd("C:/Users/akash/Desktop/StatsCourses/JHU_Specialization/Course8/w4/answers")
+pml_write_files = function(x){
+  n = length(x)
+   for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=TRUE,col.names=TRUE)
+  }
+}
+
+pml_write_files(pfinal)
+```
+
+###References:
+Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; Fuks, H. Qualitative Activity Recognition of Weight Lifting Exercises. Proceedings of 4th International Conference in Cooperation with SIGCHI (Augmented Human '13) . Stuttgart, Germany: ACM SIGCHI, 2013.
+
+Read more: http://groupware.les.inf.puc-rio.br/har#ixzz4WcKtuSfy
